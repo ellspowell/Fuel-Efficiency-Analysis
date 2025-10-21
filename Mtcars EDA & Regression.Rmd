@@ -1,0 +1,142 @@
+---
+title: "MtCars Data Analysis"
+author: "EP"
+date: "2025-10-21"
+output:
+  word_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Is fuel efficiency significantly associated with vehicle weight?
+
+Load data and libraries:
+```{r, include=FALSE}
+library(ggplot2)
+library(dplyr)
+
+data <- mtcars
+```
+```{r}
+head(data)
+```
+
+Mtcars is a built-in data set within R containing data collected from the 1974 Motor Trend US magazine. It is a dataframe containing 32 observations of 11 numeric variables:
+ - mpg, Miles per (US) gallon
+ - cyl, Number of cylinders
+ - disp, Displacement (cu. in.)
+ - hp, Gross horsepower
+ - drat, Rear axle ratio
+ - wt, Weight (1000lbs)
+ - qsec, 1/4 mile time
+ - vs, Engine (0 = V-shaped, 1 = Straight)
+ - am, Transmission (0 = automatic, 1 = manual)
+ - gear, Number of forward gears
+ - carb, Number of carburetors 
+
+### Exploratory Data Analysis
+
+```{r}
+ggplot(mtcars, aes(x=wt, y = mpg)) +
+  geom_point(color = "blue") +
+  labs(title = "Scatter Plot showing Miles Per Gallon by Weight",
+       y = "Miles per Gallon (mpg)",
+       x = "Weight") +
+  theme_minimal()
+```
+
+This scatter plot shows a general trend of decreased mpg as weight increases, but without further investigation we can't tell if this visualisation shows a significant correlation. 
+
+```{r}
+mpg_wt <- c('mpg', 'wt')
+result<- sapply(mtcars[mpg_wt], function(x)c(mean=mean(x),sd=sd(x)))
+result
+```
+
+The sapply() function loops through the columns to calculate the mean and standard deviation for 'mpg' and 'wt'. The results here show that the mean mileage per gallon is 20.09 miles and the mean vehicle weight is 3.22, or 1.61 US tons (3.22*1000 = 3220lbs/2000 = 1.61 US tons).
+Weight has a small standard deviation of 0.98 suggesting the data is tightly clustered around the mean, i.e. the weights of the cars are similar to each other. However, the standard deviation is larger, 6.03, in mpg suggesting larger variation in mpg among vehicles.
+
+```{r, echo=FALSE}
+wt_sum <- fivenum(data$wt)
+mpg_sum <- fivenum(data$mpg)
+
+print(paste('Minimum Weight:', (wt_sum[1])))
+print(paste('Q1 Weight:', (wt_sum[2])))
+print(paste('Median Weight:', (wt_sum[3])))
+print(paste('Q3 Weight:', (wt_sum[4])))
+print(paste('Maximum Weight:', (wt_sum[5])))
+
+print(paste('Minimum Miles per Gallon:', (mpg_sum[1])))
+print(paste('Q1 Miles per Gallon:', (mpg_sum[2])))
+print(paste('Median Miles per Gallon:', (mpg_sum[3])))
+print(paste('Q3 Miles per Gallon:', (mpg_sum[4])))
+print(paste('Maximum Miles per Gallon:', (mpg_sum[5])))
+```
+The fivesum() function allows quick calculation of the minimum, 1st quartile, median, 3rd quartile, and maximum for individual columns. This output is visualised in the boxplots below. 
+```{r}
+ggplot(mtcars, aes(y=mpg))+
+  geom_boxplot(fill = 'cornflowerblue', color='blue')+
+  ggtitle('Boxplot showing Miles per (US) Gallon')+
+  labs(y = 'Miles per (US) Gallon')+
+  theme_classic()
+```
+
+```{r}
+ggplot(mtcars, aes(y=wt))+
+  geom_boxplot(fill = 'cornflowerblue', color='blue')+
+  ggtitle('Boxplot showing Weight')+
+  labs(y = 'Weight')+
+  theme_classic()
+```
+```{r}
+low_wt <- rownames(mtcars)[which.min((mtcars$wt))]
+print(paste('The lowest weight car is', low_wt))
+high_wt <- rownames(mtcars)[which.max((mtcars$wt))]
+print(paste('The highest weight car is',high_wt))
+
+low_mpg <- rownames(mtcars)[which.min((mtcars$mpg))]
+print(paste('The car with the lowest miles per gallon is',low_mpg))
+high_mpg <- rownames(mtcars)[which.max((mtcars$mpg))]
+print(paste('The car with the highest miles per gallon is',high_mpg))
+```
+In contradiction to our inital hypothesis that higher weight cars have lower mpg, the highest weight car and lowest mpg car are not the same model. 
+
+### Correlation and Regression Analysis
+```{r}
+cor.test(data$mpg,data$wt)
+```
+Using the function cor.test() to test for association between paired samples using Pearson's product-moment correlation. This shows a statistically significant (p-val=1.294e-10) negative correlation between miles per gallon and weight (-0.868) where as weight increases, fuel efficiency (mpg) decreases. The confidence intervals [-0.934,-0.744] does not include 0 further supporting that the correlation is significantly different from 0. It also indicates that the true population correlation is likely to be strongly negative.
+
+```{r}
+regression <- lm(mpg~wt, data = mtcars)
+summary(regression)
+```
+This regression model also shows a strong negative relationship where as car weight increases, fuel efficiency (mpg) decreases. The p-value = 1.29e-10 indicates it is a statistically significant strong negative relationship. 
+The R2 value, 0.7528, and adjusted R2 value, 0.7446, are similar and suggest that approximately 75% of the variation within the mpg is explained by car weight. 
+
+The regression equation is as follows:
+ 
+Predicted mpg = 37.29 - 5.34 x wt
+
+This suggests that with every 1000lb increase in vehicle weight, there is an associated average decrease of 5.34mpg. 
+
+Using the regression model above, you can predict the mpg for any weight car:
+```{r}
+df <- data.frame(wt=c(1,2,3,4,5,6))
+predicted_model <- predict(regression, newdata = df)
+predicted_model
+```
+Finally, this plot plots both the regression line and scatter plot of the variables. 
+```{r}
+ggplot(data=mtcars,aes(x=wt , y=mpg))+
+  geom_point(color="cornflowerblue",size=2)+
+  geom_smooth(method="lm")+
+  annotate("text", x=5, y=30,
+           label="mpg = 37.29 - 5.34 × wt\nR² = 0.75",
+           hjust = 1, size=4, color='black')+
+  theme_classic()+
+  labs(x="Weight",y="Miles per Gallon",title="Relationship Between Weight and Fuel Efficiency")
+```
